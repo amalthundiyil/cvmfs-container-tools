@@ -1,0 +1,26 @@
+version: '3'
+
+services:
+    cvmfs-stratum0:
+        image: amalthundiyil/cvmfs-stratum0:latest
+        container_name: cvmfs-stratum0
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-stratum0
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup:ro
+            - var_spool_cvmfs:/var/spool/cvmfs
+
+    cvmfs-client:
+        image: amalthundiyil/cvmfs-client:latest
+        container_name: cvmfs-client
+        privileged: true
+        build:
+            context: .
+            dockerfile: Dockerfile-client
+        volumes:
+            - /sys/fs/cgroup:/sys/fs/cgroup:ro
+
+volumes:
+    var_spool_cvmfs:
