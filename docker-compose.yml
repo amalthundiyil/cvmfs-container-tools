@@ -4,6 +4,7 @@ services:
     cvmfs-stratum0:
         image: amalthundiyil/cvmfs-stratum0:latest
         container_name: cvmfs-stratum0
+        hostname: cvmfs-stratum0
         privileged: true
         build:
             context: .
@@ -15,6 +16,7 @@ services:
     cvmfs-client:
         image: amalthundiyil/cvmfs-client:latest
         container_name: cvmfs-client
+        hostname: cvmfs-client
         privileged: true
         build:
             context: .
