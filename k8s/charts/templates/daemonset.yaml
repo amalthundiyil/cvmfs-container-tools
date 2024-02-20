@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "cvmfs.fullname" . }}
+  labels:
+    {{- include "cvmfs.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "cvmfs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cvmfs.selectorLabels" . | nindent 8 }}
+        {{- toYaml .Values.customLabels | nindent 8 }}
+    spec:
+      #hostPID: true
+      terminationGracePeriodSeconds: 60
+      {{- if .Values.podAssignment.enableNodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.customLabels | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: cvmfs-init0-create-varruncvmfs
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args: ["mkdir -p /var/run/cvmfs; chown cvmfs:cvmfs /var/run/cvmfs"]
+          volumeMounts:
+            - name: cvmfs-run-sockets
+              mountPath: /var/run/cvmfs
+        - name: cvmfs-init1-create-mountpoints
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+          command: ["/bin/sh", "-c"]
+          args: ["for repo in $CVMFS_REPOSITORIES; do /root/create_mountpoint.sh $repo; done"]
+          env:
+            - name: CVMFS_REPOSITORIES
+              value: {{ template "repolist" . }}
+          volumeMounts:
+            - name: cvmfs-cfgmap-create-mountpoint
+              mountPath: /root/create_mountpoint.sh
+              subPath: create_mountpoint.sh
+            - name: cvmfs-export
+              mountPath: /cvmfs
+              mountPropagation: Bidirectional
+      containers:
+        - name: cvmfs
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ["SYS_ADMIN"]
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/usr/bin/supervisorctl", "shutdown"]
+          {{- if .Values.resources }}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: cvmfs-dev-fuse
+              mountPath: /dev/fuse
+            - name: cvmfs-run-sockets
+              mountPath: /var/run/cvmfs
+            - name: cvmfs-cfgmap-supervisord-conf
+              mountPath: /etc/supervisord.conf
+              subPath: supervisord.conf
+            - name: cvmfs-cfgmap-supervisord-procs 
+              mountPath: /etc/supervisord.d
+            - name: cvmfs-cfgmap-default-local
+              mountPath: /etc/cvmfs/default.local
+              subPath: default.local
+            - name: cvmfs-cfgmap-config-d
+              mountPath: /etc/cvmfs/config.d
+            - name: cvmfs-export
+              mountPath: /cvmfs
+              mountPropagation: Bidirectional
+        {{- if .Values.prefetcher.enabled }}
+        - name: cvmfs-prefetcher
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/usr/sbin/crond", "-n", "-s", "-x", "ext,sch,proc,pars,misc,bit"]
+          volumeMounts:
+            - name: cvmfs-prefetcher-crontab
+              mountPath: /etc/cron.d
+            - name: cvmfs-export
+              mountPath: /cvmfs
+              mountPropagation: HostToContainer
+        {{- end }}
+      volumes:
+        - name: cvmfs-dev-fuse
+          hostPath:
+            path: /dev/fuse
+            type: CharDevice
+        - name: cvmfs-run-sockets
+          emptyDir:
+            medium: Memory
+        - name: cvmfs-cfgmap-create-mountpoint
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-cfgmap-create-mountpoint
+            defaultMode: 0755
+        - name: cvmfs-cfgmap-supervisord-conf
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-cfgmap-supervisord-conf
+        - name: cvmfs-cfgmap-supervisord-procs
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-cfgmap-supervisord-procs
+        - name: cvmfs-cfgmap-default-local
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-cfgmap-default-local
+        - name: cvmfs-cfgmap-config-d
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-cfgmap-config-d
+        - name: cvmfs-prefetcher-crontab
+          configMap:
+            name: {{ include "cvmfs.fullname" . }}-prefetcher-crontab
+        - name: cvmfs-export
+          hostPath:
+            path: {{ include "host_mountpoint" . }}
+            type: DirectoryOrCreate
