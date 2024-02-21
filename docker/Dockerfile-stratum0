@@ -3,5 +3,8 @@ FROM gitlab-registry.cern.ch/linuxsupport/alma9-base
 RUN yum install -y https://ecsft.cern.ch/dist/cvmfs/cvmfs-release/cvmfs-release-latest.noarch.rpm
 RUN yum install -y cvmfs cvmfs-server
 
+RUN systemctl enable httpd
+RUN systemctl disable autofs
+
 CMD ["/usr/sbin/init"]
 
