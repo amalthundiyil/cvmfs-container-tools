@@ -1,5 +1,11 @@
 FROM 	    gitlab-registry.cern.ch/linuxsupport/alma9-base
 
+# This two args should not be necessary, but the bug fixed by
+# https://github.com/opencontainers/runc/pull/2086
+# makes them necessary in our environment
+ARG SFTNIGHT_UID=5005
+ARG SFTNIGHT_GID=5005
+
 RUN         dnf -y update
 RUN         dnf -y install filesystem
 RUN         dnf -y install dnf-utils && dnf config-manager --set-enabled crb
@@ -35,13 +41,23 @@ RUN         dnf -y install                     \
                        attr                    \
                        autofs                  \
                        fuse                    \
+                       fuse3                   \
+                       sudo                    \
                        httpd
 
-RUN GOBIN=/usr/bin go install github.com/jstemmer/go-junit-report@latest
+WORKDIR     /home/sftnight
 
 RUN git clone https://github.com/cvmfs/cvmfs && \
     cd cvmfs && mkdir build && cd build && \
-    cmake -S .. && make -j && make install
+    cmake -S .. && make && make install
+
+# Similarly to the node above.
+# `adduser sftnight` should be sufficient, but the bug above requires
+# this workaround
+RUN  groupadd --gid $SFTNIGHT_GID sftnight && \
+        adduser --uid $SFTNIGHT_UID --gid $SFTNIGHT_GID sftnight
+# 
+# USER        sftnight
 
 CMD ["/usr/sbin/init"]
 
