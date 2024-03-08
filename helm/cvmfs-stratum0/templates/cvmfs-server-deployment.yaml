@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cvmfs-stratum0-deployment
+  namespace: cvmfs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cvmfs
+  template:
+    metadata:
+      labels:
+        app: cvmfs
+    spec:
+      containers:
+      - name: cvmfs-stratum0
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        ports:
+        - containerPort: 80
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: var-spool-cvmfs
+          mountPath: /var/spool/cvmfs
+      volumes:
+      - name: var-spool-cvmfs
+        emptyDir: {}
+

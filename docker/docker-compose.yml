@@ -6,7 +6,6 @@ services:
         container_name: cvmfs-stratum0
         hostname: cvmfs-stratum0
         privileged: true
-        cgroup: host
         build:
             context: .
             dockerfile: Dockerfile-stratum0
@@ -19,7 +18,6 @@ services:
         container_name: cvmfs-client
         hostname: cvmfs-client
         privileged: true
-        cgroup: host
         build:
             context: .
             dockerfile: Dockerfile-client
@@ -28,3 +26,4 @@ services:
 
 volumes:
     var_spool_cvmfs:
+
